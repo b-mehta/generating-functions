@@ -41,13 +41,99 @@ lemma coeff_differentiate [semiring α] (f : power_series α) (n : ℕ) :
   coeff _ n (differentiate f) = (n+1) * coeff _ (n+1) f :=
 coeff_mk _ _
 
+-- move to list.nat_antidiagonal
+@[simp]
+lemma list.nat.antidiagonal_succ {n : ℕ} :
+  list.nat.antidiagonal (n + 1) = (0,n + 1) :: ((list.nat.antidiagonal n).map (prod.map nat.succ id) ) :=
+begin
+  simp only [list.nat.antidiagonal, list.range_succ_eq_map, list.map_cons, true_and,
+    nat.add_succ_sub_one, add_zero, id.def, eq_self_iff_true, nat.sub_zero, list.map_map, prod.map_mk],
+  apply congr (congr rfl _) rfl,
+  ext; simp,
+end
+
+-- move to multiset.nat_antidiagonal
+@[simp]
+lemma multiset.nat.antidiagonal_succ {n : ℕ} :
+  multiset.nat.antidiagonal (n + 1) = (0,n + 1) :: ((multiset.nat.antidiagonal n).map (prod.map nat.succ id) ) :=
+begin
+  unfold multiset.nat.antidiagonal,
+  rw list.nat.antidiagonal_succ,
+  simp only [multiset.coe_map, multiset.cons_coe, id.def, prod_map, list.perm_cons, multiset.coe_eq_coe, list.map],
+end
+
+section prod_map
+
+variables {α₁ : Type*} {α₂ : Type*} {β₁ : Type*} {β₂ : Type*} (f : α₁ ↪ α₂) (g : β₁ ↪ β₂)
+
+def embedding.prod_map : (α₁ × β₁) ↪ α₂ × β₂ :=
+{ to_fun := prod.map f g,
+  inj' := λ x y h, prod.ext (f.injective (prod.ext_iff.1 h).1) (g.injective (prod.ext_iff.1 h).2) }
+
+variables {f} {g}
+
+@[simp]
+def embedding.coe_prod_map :
+  ⇑(embedding.prod_map f g) = prod.map f g := rfl
+
+end prod_map
+
+-- move to finset.nat_antidiagonal
+lemma finset.nat.antidiagonal_succ {n : ℕ} :
+  finset.nat.antidiagonal (n + 1) = insert (0,n + 1) ((finset.nat.antidiagonal n).map ⟨prod.map nat.succ id, function.injective.prod_map nat.succ_injective function.injective_id⟩ ) :=
+begin
+  apply finset.eq_of_veq,
+  rw [finset.insert_val_of_not_mem, finset.map_val],
+  {apply multiset.nat.antidiagonal_succ},
+  { intro con, rcases finset.mem_map.1 con with ⟨⟨a,b⟩, ⟨h1, h2⟩⟩,
+    simp only [id.def, prod.mk.inj_iff, function.embedding.coe_fn_mk, prod.map_mk] at h2,
+    apply nat.succ_ne_zero a h2.1, }
+end
+
+lemma finset.nat.sum_antidiagonal_succ {α : Type*} [add_comm_monoid α] {n : ℕ} {f : ℕ × ℕ → α} :
+  (finset.nat.antidiagonal (n + 1)).sum f = f (0, n + 1) + ((finset.nat.antidiagonal n).map ⟨prod.map nat.succ id, function.injective.prod_map nat.succ_injective function.injective_id⟩).sum f :=
+begin
+  rw [finset.nat.antidiagonal_succ, finset.sum_insert],
+  intro con, rcases finset.mem_map.1 con with ⟨⟨a,b⟩, ⟨h1, h2⟩⟩,
+  simp only [id.def, prod.mk.inj_iff, function.embedding.coe_fn_mk, prod.map_mk] at h2,
+  apply nat.succ_ne_zero a h2.1,
+end
+
+lemma finset.nat.map_swap_antidiagonal {n : ℕ} :
+  (finset.nat.antidiagonal n).map ⟨prod.swap, prod.swap_right_inverse.injective⟩ = finset.nat.antidiagonal n :=
+begin
+  ext,
+  simp only [exists_prop, finset.mem_map, finset.nat.mem_antidiagonal, function.embedding.coe_fn_mk, prod.swap_prod_mk,
+ prod.exists],
+  rw add_comm,
+  split,
+  { rintro ⟨b, c, ⟨rfl, rfl⟩⟩,
+    simp },
+  { rintro rfl,
+    use a.snd,
+    use a.fst,
+    simp }
+end
+
 /-- Product rule -/
-lemma diff_mul [semiring α] (f g : power_series α) :
+lemma diff_mul [comm_semiring α] (f g : power_series α) :
   differentiate (f * g) = differentiate f * g + f * differentiate g :=
 begin
   ext,
-  -- simp [coeff_mul],
-  sorry -- help?
+  simp only [coeff_mul, add_monoid_hom.map_add, coeff_differentiate],
+  transitivity (finset.nat.antidiagonal (n + 1)).sum (λ (p : ℕ × ℕ), (↑(p.fst)) * (coeff α (p.fst)) f * (coeff α p.snd) g) + (finset.nat.antidiagonal (n + 1)).sum (λ (p : ℕ × ℕ), (coeff α p.fst) f * ((↑(p.snd)) * (coeff α p.snd) g)),
+  { rw ← finset.sum_add_distrib, rw finset.mul_sum,
+    apply finset.sum_congr rfl,
+    intros x hx,
+    rw [← mul_assoc _ (↑x.snd) _, mul_comm ((coeff α x.fst) f) (↑x.snd), mul_assoc, mul_assoc,
+        ← add_mul, ← nat.cast_add, finset.nat.mem_antidiagonal.1 hx],
+    simp },
+  { refine congr (congr rfl _) _,
+    { simp [finset.nat.sum_antidiagonal_succ] },
+    { rw [← finset.nat.map_swap_antidiagonal, finset.sum_map],
+      symmetry,
+      rw [← finset.nat.map_swap_antidiagonal, finset.sum_map, finset.nat.sum_antidiagonal_succ],
+      simp } }
 end
 
 @[simp]
