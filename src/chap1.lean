@@ -1,4 +1,6 @@
 import ring_theory.power_series
+import combinatorics.composition
+import data.nat.parity
 
 open power_series
 noncomputable theory
@@ -94,6 +96,7 @@ end
 begin
   sorry -- open PR to mathlib so sorry here
 end
+@[simp]
 lemma coeff_smul (a : α) (n : ℕ) (f : power_series α) [semiring α] :
   coeff _ n (a • f) = a * coeff _ n f :=
 begin
@@ -203,4 +206,52 @@ begin
     simp,
   rw mul_comm X,
   simp [mul_sub, coeff_smul, pow_succ],
+end
+
+/-- The sequence from section 1.2 of GFology -/
+def sequence_one_two : ℕ → ℚ
+| 0 := 1
+| (n+1) := 2 * sequence_one_two n + n
+
+lemma my_seq2 :
+  generating_function sequence_one_two = (1 - (2:ℚ)•X + (2:ℚ)•X^2) * ((1 - X)^2)⁻¹ * (1 - (2:ℚ)•X)⁻¹ :=
+begin
+  rw [eq_mul_inv_iff, eq_mul_inv_iff],
+  { ext,
+    cases n,
+    { simp [sequence_one_two, pow_two] },
+    cases n,
+    { simp [← mul_assoc, coeff_X_pow, sequence_one_two, pow_two (1 - X), mul_sub, sub_mul],
+      norm_num },
+    cases n,
+    { simp [coeff_X_pow, mul_sub, sub_mul, pow_two (1 - X), sequence_one_two, ← mul_assoc, coeff_X],
+      norm_num },
+    simp [pow_two (1 - X), mul_sub, sub_mul, sequence_one_two, ← mul_assoc, coeff_one_X,
+          coeff_X_pow, coeff_X],
+    ring },
+  { simp },
+  { simp },
+end
+
+lemma gf_proof2 (n : ℕ) : sequence_one_two n = 2^(n+1) - n - 1 :=
+begin
+  suffices : coeff _ n (generating_function sequence_one_two) = 2^(n+1) - n - 1,
+    simpa,
+  have : (1 - (2:ℚ)•(X : power_series ℚ) + (2:ℚ)•X^2) * ((1-X)^2)⁻¹ * (1 - (2:ℚ)•X)⁻¹ = (2:ℚ)•(1 - (2:ℚ)•X)⁻¹ - ((1-X)^2)⁻¹,
+    rw [mul_inv_eq_iff, sub_mul, algebra.smul_mul_assoc, power_series.inv_mul,
+        mul_inv_eq_iff, sub_mul, mul_comm _⁻¹, mul_assoc, power_series.inv_mul],
+    simp [← sub_add, sub_mul, mul_sub, two_smul],
+    ring,
+    simp, simp, simp, simp,
+  rw [my_seq2, this],
+  simp only [←basic_arith_geom, coeff_mk, coeff_smul, add_monoid_hom.map_sub, big_geom'],
+  simp [sub_sub, pow_succ],
+end
+
+lemma inductive_proof2 : ∀ n, sequence_one_two n = 2^(n+1) - n - 1
+| 0 := rfl
+| (n+1) :=
+begin
+  simp [sequence_one_two, inductive_proof2 n, pow_succ],
+  ring,
 end
