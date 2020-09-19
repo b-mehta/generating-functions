@@ -219,6 +219,8 @@ end
 
 lemma eq_inv_iff [field α] {a b : power_series α} (h : constant_coeff _ b ≠ 0) : a = b⁻¹ ↔ a * b = 1 :=
 by rw [← eq_mul_inv_iff h, one_mul]
+lemma power_series.inv_eq_iff [field α] {a b : power_series α} (h : constant_coeff _ b ≠ 0) : b⁻¹ = a ↔ a * b = 1 :=
+by rw [eq_comm, eq_inv_iff h]
 
 lemma big_geom (q : ℚ) : generating_function (λ n, q ^ n) = (1 - q • X)⁻¹ :=
 begin
