@@ -327,8 +327,7 @@ begin
   intros, refl,
 end
 
-def mk_odd : ℕ ↪ ℕ :=
-⟨λ i, 2 * i + 1, λ x y h, by linarith⟩
+def mk_odd : ℕ ↪ ℕ := ⟨λ i, 2 * i + 1, λ x y h, by linarith⟩
 
 lemma mem_sum {β : Type*} {f : α → multiset β} (s : finset α) (b : β) :
   b ∈ ∑ x in s, f x ↔ ∃ a ∈ s, b ∈ f a :=
@@ -425,6 +424,10 @@ begin
       assumption } }
 end
 
+lemma multiset.single_le_sum {a : ℕ} (s : multiset ℕ) (h : a ∈ s) :
+  a ≤ s.sum :=
+sorry
+
 /--  If m is big enough, the partial product's coefficient counts the number of odd partitions -/
 theorem odd_gf_prop (n m : ℕ) (h : n < m * 2) :
   (fintype.card (odd_partition n) : ℚ) = coeff ℚ n (partial_odd_gf m) :=
@@ -435,7 +438,8 @@ begin
   intros p hp,
   apply ball_congr,
   intros i hi,
-  have : i ≤ n, sorry,
+  have : i ≤ n,
+    simpa [p.blocks_sum] using multiset.single_le_sum _ hi,
   simp only [mk_odd, exists_prop, mem_range, function.embedding.coe_fn_mk, mem_map],
   split,
     intro hi₂,
