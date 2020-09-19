@@ -424,9 +424,19 @@ begin
       assumption } }
 end
 
-lemma multiset.single_le_sum {a : ℕ} (s : multiset ℕ) (h : a ∈ s) :
-  a ≤ s.sum :=
-sorry
+lemma multiset.single_le_sum {a : ℕ} (s : multiset ℕ) :
+  a ∈ s → a ≤ s.sum :=
+begin
+  apply multiset.induction_on s,
+    simp,
+  rintros b s₁ ih h,
+  rw multiset.sum_cons,
+  rw multiset.mem_cons at h,
+  rcases h with rfl | _,
+  exact nat.le.intro rfl,
+  apply le_add_left,
+  apply ih h,
+end
 
 /--  If m is big enough, the partial product's coefficient counts the number of odd partitions -/
 theorem odd_gf_prop (n m : ℕ) (h : n < m * 2) :
