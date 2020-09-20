@@ -2,6 +2,7 @@ import ring_theory.power_series
 import combinatorics.composition
 import data.nat.parity
 import data.finset.nat_antidiagonal
+import tactic.fin_cases
 import chap1
 
 open finset
@@ -75,13 +76,13 @@ begin
 end
 
 def partial_odd_gf (n : ℕ) := ∏ i in range n, (1 - (X : power_series ℚ)^(2*i+1))⁻¹
-def partial_distinct_gf (n : ℕ) := ∏ i in range n, (1 + (X : power_series ℚ)^i)
+def partial_distinct_gf (n : ℕ) := ∏ i in range n, (1 + (X : power_series ℚ)^(i+1))
 
 def odd_partition (n : ℕ) := {c : partition n // ∀ i ∈ c.blocks, ¬ nat.even i}
+def distinct_partition (n : ℕ) := {c : partition n // multiset.nodup c.blocks}
+
 instance (n : ℕ) : fintype (odd_partition n) :=
 subtype.fintype _
-
-def distinct_partition (n : ℕ) := {c : partition n // multiset.nodup c.blocks}
 instance (n : ℕ) : fintype (distinct_partition n) :=
 subtype.fintype _
 
@@ -244,6 +245,17 @@ begin
   simp [coeff_mul],
 end
 
+lemma two_series (i : ℕ) :
+  (1 + (X : power_series ℚ)^i.succ) = indicator_series ℚ {0, i.succ} :=
+begin
+  ext,
+  simp only [coeff_indicator, coeff_one, add_monoid_hom.map_add, coeff_X_pow,
+             ← @set.mem_def _ _ {0, i.succ}, set.mem_insert_iff, set.mem_singleton_iff],
+  by_cases n = 0,
+    cases h,
+    simp [(nat.succ_ne_zero i).symm],
+  simp [h],
+end
 
 lemma num_series (i : ℕ) :
   (1 - (X : power_series ℚ)^(i+1))⁻¹ = indicator_series ℚ (λ k, ∃ p, (i+1) * p = k) :=
@@ -464,6 +476,211 @@ begin
   apply nat.two_not_dvd_two_mul_add_one,
 end
 
+example (m : ℕ) (i : ℕ)
+  (hp₁ : 0 < i)
+  (hp₄ : i < m + 1) :
+  i - 1 < m :=
+begin
+  rwa nat.sub_lt_right_iff_lt_add hp₁,
+end
+
+
+lemma partial_distinct_gf_prop (n m : ℕ) :
+  (finset.card ((univ : finset (partition n)).filter (λ p, p.blocks.nodup ∧ ∀ j ∈ p.blocks, j ∈ (range m).map ⟨nat.succ, nat.succ_injective⟩)) : ℚ) =
+  coeff ℚ n (partial_distinct_gf m) :=
+begin
+  simp_rw [partial_distinct_gf, two_series],
+  erw ← finset.prod_map (range m) ⟨_, nat.succ_injective⟩ (λ t, indicator_series ℚ {0, t}),
+  simp_rw [coeff_prod_range, coeff_indicator, prod_ite_one_zero, sum_boole,
+           ← @set.mem_def _ _ {0, _}, set.mem_insert_iff, set.mem_singleton_iff],
+  norm_cast,
+  refine card_eq_of_bijection _ _ _ _,
+  { intros p i, apply multiset.count i p.blocks * i },
+  { simp only [mem_filter, mem_cut, mem_univ, true_and, exists_prop, and_assoc,
+               and_imp, nat.mul_eq_zero, function.embedding.coe_fn_mk, exists_imp_distrib],
+    rintro ⟨p, hp₁, hp₂⟩ hp₃ hp₄,
+    refine ⟨_, _, _⟩,
+    { rw auxy _ _ _ hp₂,
+      apply hp₄ },
+    { intros i hi,
+      left,
+      apply multiset.count_eq_zero_of_not_mem,
+      apply mt (hp₄ i) hi },
+    { intros i hi,
+      rw multiset.nodup_iff_count_le_one at hp₃,
+      specialize hp₃ i,
+      dsimp at *,
+      set k := multiset.count i p with q,
+      rw ← q at *,
+      interval_cases k,
+        left, left, assumption,
+      rw h, right, simp } },
+  { simp only [mem_filter, mem_cut, mem_univ, exists_prop, true_and, and_assoc],
+    rintros f ⟨hf₁, hf₂, hf₃⟩,
+    refine ⟨⟨∑ i in map ⟨_, nat.succ_injective⟩ (range m), multiset.repeat i (f i / i), _, _⟩, _, _, _⟩,
+    { intros i hi,
+      simp only [exists_prop, mem_sum, mem_map, function.embedding.coe_fn_mk] at hi,
+      rcases hi with ⟨_, ⟨_, _, rfl⟩, _⟩,
+      cases multiset.eq_of_mem_repeat hi_h_right,
+      exact nat.succ_pos hi_h_left_w },
+    { rw sum_sum,
+      simp_rw [multiset.sum_repeat, nat.nsmul_eq_mul],
+      have : ∀ i ∈ map ⟨_, nat.succ_injective⟩ (range m), i ∣ f i,
+      { intros i hi,
+        cases hf₃ i hi; rw h,
+          exact dvd_zero i },
+      { rw sum_congr rfl (λ i hi, nat.div_mul_cancel (this i hi)),
+        apply hf₁ } },
+    { rw multiset.nodup_iff_count_le_one,
+      intro i,
+      dsimp,
+      rw ← sum_hom _ (multiset.count i),
+      simp_rw [count_repeat_ite],
+      simp only [sum_ite_eq],
+      split_ifs,
+      { cases hf₃ i h with h₁ h₁; rw h₁,
+          simp,
+        cases i,
+          simp,
+        apply le_of_eq,
+        apply nat.div_self,
+        exact nat.succ_pos i },
+      { norm_num } },
+    { intros i hi,
+      dsimp at hi,
+      rw mem_sum at hi,
+      rcases hi with ⟨_, _, _⟩,
+      cases multiset.eq_of_mem_repeat hi_h_h,
+      assumption },
+    { ext i,
+      dsimp,
+      rw ← sum_hom _ (multiset.count i),
+      simp_rw [count_repeat_ite],
+      simp only [sum_ite_eq],
+      split_ifs,
+      { apply nat.div_mul_cancel,
+        cases hf₃ i h; rw h_1,
+        apply dvd_zero },
+      { rw [zero_mul],
+        apply (hf₂ i h).symm } } },
+  { intros p₁ p₂ hp₁ hp₂ h,
+    apply partition.ext,
+    simp only [true_and, mem_univ, mem_filter] at hp₁ hp₂,
+    ext i,
+    rw function.funext_iff at h,
+    specialize h i,
+    cases i,
+    { rw multiset.count_eq_zero_of_not_mem,
+      rw multiset.count_eq_zero_of_not_mem,
+      intro,
+      simpa [nat.succ_ne_zero] using hp₂.2 0 a,
+      intro,
+      simpa [nat.succ_ne_zero] using hp₁.2 0 a },
+    { rwa nat.mul_left_inj at h,
+      exact nat.succ_pos i } },
+end
+
+/--  If m is big enough, the partial product's coefficient counts the number of distinct partitions -/
+theorem distinct_gf_prop (n m : ℕ) (h : n < m + 1) :
+  (fintype.card (distinct_partition n) : ℚ) = coeff ℚ n (partial_distinct_gf m) :=
+begin
+  erw [fintype.subtype_card, ← partial_distinct_gf_prop],
+  congr' 2,
+  apply filter_congr,
+  intros p hp,
+  apply (and_iff_left _).symm,
+  intros i hi,
+  have : i ≤ n,
+    simpa [p.blocks_sum] using multiset.single_le_sum _ hi,
+  simp only [mk_odd, exists_prop, mem_range, function.embedding.coe_fn_mk, mem_map],
+  refine ⟨i-1, _, _⟩,
+  rw nat.sub_lt_right_iff_lt_add,
+  apply lt_of_le_of_lt ‹i ≤ n› h,
+  apply p.blocks_pos hi,
+  apply nat.succ_pred_eq_of_pos,
+  apply p.blocks_pos hi,
+end
+
+lemma same_gf (n : ℕ) :
+  partial_odd_gf n * (range n).prod (λ i, (1 - (X : power_series ℚ)^(n+i+1))) = partial_distinct_gf n :=
+begin
+  rw [partial_odd_gf, partial_distinct_gf],
+  induction n with n ih,
+  { simp },
+  let Z : power_series ℚ := ∏ (x : ℕ) in range n, (1 - X^(2*x+1))⁻¹,
+  rw [prod_range_succ _ n, prod_range_succ _ n, prod_range_succ _ n, ← ih],
+  clear ih,
+  erw ← two_mul (n+1),
+  have : 1 - (X : power_series ℚ) ^ (2 * (n+1)) = (1 + X^(n+1)) * (1 - X^(n+1)),
+    rw [← sq_sub_sq, one_pow, ← pow_mul, mul_comm],
+  rw this, clear this,
+  change (_ * Z) * (((1 + X^(n+1)) * _) * _) = (1 + X^(n+1)) * (Z * _),
+  rw [mul_assoc, mul_assoc, ← mul_assoc Z, mul_left_comm _ (Z * _), mul_left_comm _ Z,
+      ← mul_assoc Z],
+  congr' 1,
+  have := prod_range_succ' (λ x, 1 - (X : power_series ℚ)^(n.succ + x)) n,
+  dsimp at this,
+  simp_rw [← add_assoc, add_zero, mul_comm _ (1 - X ^ n.succ)] at this,
+  erw [← this],
+  rw [prod_range_succ],
+  simp_rw [nat.succ_eq_add_one, add_right_comm _ 1, ← two_mul, ← mul_assoc],
+  rw [power_series.inv_mul, one_mul],
+  simp [zero_pow],
+end
+
+lemma coeff_prod_one_add (n : ℕ) [comm_semiring α] (φ ψ : power_series α) (h : ↑n < ψ.order) :
+  coeff α n (φ * ψ) = 0 :=
+begin
+  rw [coeff_mul],
+  have : ∑ p in nat.antidiagonal n, (0 : α) = 0,
+    rw [sum_const, nsmul_zero],
+  rw ← this,
+  apply sum_congr rfl _,
+  rintros pq hpq,
+  apply mul_eq_zero_of_right,
+  apply coeff_of_lt_order,
+  apply lt_of_le_of_lt _ h,
+  rw nat.mem_antidiagonal at hpq,
+  norm_cast,
+  rw ← hpq,
+  apply le_add_left,
+  apply le_refl,
+end
+
+lemma coeff_prod_one_sub (n : ℕ) [comm_ring α] (φ ψ : power_series α) (h : ↑n < ψ.order) :
+  coeff α n (φ * (1 - ψ)) = coeff α n φ :=
+by rw [mul_sub, mul_one, add_monoid_hom.map_sub, coeff_prod_one_add _ _ _ h, sub_zero]
+
+lemma coeff_big_prod_one_sub (n : ℕ) [comm_ring α] (φ ψ : power_series α) (h : ↑n < ψ.order) :
+  coeff α n (φ * (1 - ψ)) = coeff α n φ :=
+by rw [mul_sub, mul_one, add_monoid_hom.map_sub, coeff_prod_one_add _ _ _ h, sub_zero]
+
+lemma same_coeffs (n m : ℕ) (h : m ≤ n) :
+  coeff ℚ m (partial_odd_gf n) = coeff ℚ m (partial_distinct_gf n) :=
+begin
+  rw ← same_gf,
+  set! k := n with h,
+  apply_fun range at h,
+  rw ← h,
+  clear_value k, clear h,
+  induction k,
+    simp,
+  rwa [prod_range_succ, ← mul_assoc, mul_right_comm, coeff_big_prod_one_sub],
+  simp only [enat.coe_one, enat.coe_add, order_X_pow],
+  norm_cast,
+  rw nat.lt_succ_iff,
+  apply le_add_right,
+  assumption,
+end
+
 theorem freek (n : ℕ) : fintype.card (odd_partition n) = fintype.card (distinct_partition n) :=
 begin
+  suffices : (fintype.card (odd_partition n) : ℚ) = fintype.card (distinct_partition n),
+    norm_cast at this, assumption,
+  rw distinct_gf_prop _ (n+1),
+  rw odd_gf_prop _ (n+1),
+  apply same_coeffs,
+  linarith,
+  linarith,
+  linarith,
 end
