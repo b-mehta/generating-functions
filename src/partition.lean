@@ -9,28 +9,6 @@ import chap1
 open finset
 open_locale big_operators
 
-lemma filter_false_of_mem {α : Type*} (s : finset α) (p : α → Prop) [decidable_pred p]
-  (h : ∀ x ∈ s, ¬ p x) : filter p s = ∅ :=
-begin
-  apply eq_empty_of_forall_not_mem,
-  simpa,
-end
-
-lemma prod_ite_one_zero {α : Type*} (s : finset α) (p : α → Prop) [decidable_pred p] :
-  ∏ i in s, ite (p i) (1 : ℚ) 0 = ite (∀ i ∈ s, p i) 1 0 :=
-begin
-  split_ifs,
-  rw [prod_ite, prod_eq_one _, one_mul],
-  have : filter (λ x, ¬ p x) s = ∅,
-    refine filter_false_of_mem s (λ x, ¬ p x) _, simpa,
-  rw this, simp,
-  intros, refl,
-  push_neg at h,
-  rcases h with ⟨i, hi, hq⟩,
-  apply prod_eq_zero hi,
-  rw [if_neg hq],
-end
-
 lemma count_repeat_ite {α : Type*} [decidable_eq α] (a b : α) (n : ℕ)  :
   multiset.count a (multiset.repeat b n) = if (a = b) then n else 0 :=
 begin
@@ -401,7 +379,7 @@ lemma partial_odd_gf_prop (n m : ℕ) :
 begin
   simp_rw [partial_odd_gf, num_series],
   erw ← finset.prod_map (range m) mk_odd (λ t, indicator_series ℚ (λ (k : ℕ), ∃ (p : ℕ), t * p = k)),
-  simp_rw [coeff_prod_range, coeff_indicator, prod_ite_one_zero, sum_boole],
+  simp_rw [coeff_prod_range, coeff_indicator, prod_boole, sum_boole],
   norm_cast,
   refine card_eq_of_bijection _ _ _ _,
   { intros p i, apply multiset.count i p.blocks * i },
@@ -508,22 +486,13 @@ begin
   apply nat.two_not_dvd_two_mul_add_one,
 end
 
-example (m : ℕ) (i : ℕ)
-  (hp₁ : 0 < i)
-  (hp₄ : i < m + 1) :
-  i - 1 < m :=
-begin
-  rwa nat.sub_lt_right_iff_lt_add hp₁,
-end
-
-
 lemma partial_distinct_gf_prop (n m : ℕ) :
   (finset.card ((univ : finset (partition n)).filter (λ p, p.blocks.nodup ∧ ∀ j ∈ p.blocks, j ∈ (range m).map ⟨nat.succ, nat.succ_injective⟩)) : ℚ) =
   coeff ℚ n (partial_distinct_gf m) :=
 begin
   simp_rw [partial_distinct_gf, two_series],
   erw ← finset.prod_map (range m) ⟨_, nat.succ_injective⟩ (λ t, indicator_series ℚ {0, t}),
-  simp_rw [coeff_prod_range, coeff_indicator, prod_ite_one_zero, sum_boole,
+  simp_rw [coeff_prod_range, coeff_indicator, prod_boole, sum_boole,
            ← @set.mem_def _ _ {0, _}, set.mem_insert_iff, set.mem_singleton_iff],
   norm_cast,
   refine card_eq_of_bijection _ _ _ _,
