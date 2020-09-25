@@ -2,7 +2,8 @@ import ring_theory.power_series
 import combinatorics.composition
 import data.nat.parity
 import data.finset.nat_antidiagonal
-import tactic.fin_cases
+import tactic.interval_cases
+import tactic.apply_fun
 import chap1
 
 open finset
@@ -238,13 +239,6 @@ lemma constant_coeff_indicator (f : set ℕ) [semiring α] :
   constant_coeff α (indicator_series _ f) = if f 0 then 1 else 0 :=
 by rw [← coeff_zero_eq_constant_coeff_apply, coeff_indicator]
 
-lemma constant_coeff_mul [semiring α] (φ ψ : power_series α) :
-  constant_coeff α (φ * ψ) = constant_coeff α φ * constant_coeff α ψ :=
-begin
-  rw [← coeff_zero_eq_constant_coeff_apply],
-  simp [coeff_mul],
-end
-
 lemma two_series (i : ℕ) :
   (1 + (X : power_series ℚ)^i.succ) = indicator_series ℚ {0, i.succ} :=
 begin
@@ -255,6 +249,47 @@ begin
     cases h,
     simp [(nat.succ_ne_zero i).symm],
   simp [h],
+end
+
+lemma num_series' [field α] (i : ℕ) :
+  (1 - (X : power_series α)^(i+1))⁻¹ = indicator_series α (λ k, i + 1 ∣ k) :=
+begin
+  rw power_series.inv_eq_iff,
+  { ext,
+    cases n,
+    { simp [mul_sub, zero_pow, constant_coeff_indicator] },
+    { rw [coeff_one, if_neg (nat.succ_ne_zero n), mul_sub, mul_one, add_monoid_hom.map_sub,
+          coeff_indicator],
+      simp_rw [coeff_mul, coeff_X_pow, coeff_indicator, boole_mul, sum_ite, filter_filter,
+               sum_const_zero, add_zero, sum_const, nsmul_eq_mul, mul_one, sub_eq_iff_eq_add,
+               zero_add, filter_congr_decidable],
+      symmetry,
+      split_ifs,
+      { suffices : ((nat.antidiagonal n.succ).filter (λ (a : ℕ × ℕ), i + 1 ∣ a.fst ∧ a.snd = i + 1)).card = 1,
+          rw this, norm_cast,
+        rw card_eq_one,
+        cases h with p hp,
+        refine ⟨((i+1) * (p-1), i+1), _⟩,
+        ext ⟨a₁, a₂⟩,
+        simp only [mem_filter, prod.mk.inj_iff, nat.mem_antidiagonal, mem_singleton],
+        split,
+        { rintro ⟨_, ⟨a, rfl⟩, rfl⟩,
+          refine ⟨_, rfl⟩,
+          rw [nat.mul_sub_left_distrib, ← hp, ← a_left, mul_one, nat.add_sub_cancel] },
+        { rintro ⟨rfl, rfl⟩,
+          cases p,
+            rw mul_zero at hp, cases hp,
+          rw hp,
+          simp [nat.succ_eq_add_one, mul_add] } },
+      { suffices : (filter (λ (a : ℕ × ℕ), i + 1 ∣ a.fst ∧ a.snd = i + 1) (nat.antidiagonal n.succ)).card = 0,
+          rw this, norm_cast,
+        rw card_eq_zero,
+        apply eq_empty_of_forall_not_mem,
+        simp only [prod.forall, mem_filter, not_and, nat.mem_antidiagonal],
+        rintro _ h₁ h₂ ⟨a, rfl⟩ rfl,
+        apply h,
+        simp [← h₂] } } },
+  { simp [zero_pow] },
 end
 
 lemma num_series (i : ℕ) :
@@ -312,8 +347,6 @@ begin
   apply hinj; assumption,
 end
 
--- attribute [to_additive finset.sum_multiset_count] prod_multiset_count
-
 lemma sum_multiset_count [decidable_eq α] [add_comm_monoid α] (s : multiset α) :
   s.sum = ∑ m in s.to_finset, s.count m •ℕ m :=
 @prod_multiset_count (multiplicative α) _ _ s
@@ -361,7 +394,6 @@ end
 lemma sum_sum {β : Type*} [add_comm_monoid β] (f : α → multiset β) (s : finset α) :
   multiset.sum (finset.sum s f) = ∑ x in s, (f x).sum :=
 (sum_hom s multiset.sum).symm
-
 
 lemma partial_odd_gf_prop (n m : ℕ) :
   (finset.card ((univ : finset (partition n)).filter (λ p, ∀ j ∈ p.blocks, j ∈ (range m).map mk_odd)) : ℚ) =
@@ -514,7 +546,8 @@ begin
       rw ← q at *,
       interval_cases k,
         left, left, assumption,
-      rw h, right, simp } },
+      rw h, right, simp }
+       },
   { simp only [mem_filter, mem_cut, mem_univ, exists_prop, true_and, and_assoc],
     rintros f ⟨hf₁, hf₂, hf₃⟩,
     refine ⟨⟨∑ i in map ⟨_, nat.succ_injective⟩ (range m), multiset.repeat i (f i / i), _, _⟩, _, _, _⟩,
@@ -651,10 +684,6 @@ lemma coeff_prod_one_sub (n : ℕ) [comm_ring α] (φ ψ : power_series α) (h :
   coeff α n (φ * (1 - ψ)) = coeff α n φ :=
 by rw [mul_sub, mul_one, add_monoid_hom.map_sub, coeff_prod_one_add _ _ _ h, sub_zero]
 
-lemma coeff_big_prod_one_sub (n : ℕ) [comm_ring α] (φ ψ : power_series α) (h : ↑n < ψ.order) :
-  coeff α n (φ * (1 - ψ)) = coeff α n φ :=
-by rw [mul_sub, mul_one, add_monoid_hom.map_sub, coeff_prod_one_add _ _ _ h, sub_zero]
-
 lemma same_coeffs (n m : ℕ) (h : m ≤ n) :
   coeff ℚ m (partial_odd_gf n) = coeff ℚ m (partial_distinct_gf n) :=
 begin
@@ -665,7 +694,7 @@ begin
   clear_value k, clear h,
   induction k,
     simp,
-  rwa [prod_range_succ, ← mul_assoc, mul_right_comm, coeff_big_prod_one_sub],
+  rwa [prod_range_succ, ← mul_assoc, mul_right_comm, coeff_prod_one_sub],
   simp only [enat.coe_one, enat.coe_add, order_X_pow],
   norm_cast,
   rw nat.lt_succ_iff,
